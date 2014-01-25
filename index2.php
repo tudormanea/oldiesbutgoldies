@@ -1,14 +1,58 @@
 <?php
-$start = time();
-require_once("fblogin.php");
+require_once("facebook-php-sdk/src/facebook.php");
+
+$fbconfig['baseUrl'] = "https://54.201.135.223/oldiesbutgoldies"; // "http://thinkdiff.net/demo/newfbconnect1/iframe/sdk3";
+$fbconfig['appBaseUrl'] = "https://apps.facebook.com/socialmusictop"; // "http://apps.facebook.com/thinkdiffdemo";
+
+$loginConfig = array(
+    'scope' => 'user_about_me,user_location,user_friends,user_actions.music,friends_about_me,friends_location,friends_actions.music'
+);
+
+if (isset($_GET['code'])) {
+    header("Location: " . $fbconfig['appBaseUrl']);
+    die();
+}
+
+$config = array(
+    'appId' => '405884936212776',
+    'secret' => '31161e23724fce0344b96aa7dc8d2c6f',
+    'fileUpload' => false, // optional
+    'allowSignedRequest' => true, // optional, but should be set to false for non-canvas apps
+);
+
+$facebook = new Facebook($config);
+$user_id = $facebook->getUser();
+if ($user_id) {
+    // We have a user ID, so probably a logged in user.
+    // If not, we'll get an exception, which we handle below.
+    try {
+        $user_profile = $facebook->api('/me', 'GET');
+    } catch (FacebookApiException $e) {
+        // If the user is logged out, you can have a
+        // user ID even though the access token is invalid.
+        // In this case, we'll get an exception, so we'll
+        // just ask the user to login again here.
+        $login_url = $facebook->getLoginUrl($loginConfig);
+        echo("<script> top.location.href='" . $login_url . "'</script>");
+        error_log($e->getType());
+        error_log($e->getMessage());
+        die();
+    }
+} else {
+    // No user, print a link for the user to login
+    $login_url = $facebook->getLoginUrl($loginConfig);
+    echo("<script> top.location.href='" . $login_url . "'</script>");
+    die();
+}
+
 $listens = array();
 $myListens = $facebook->api("/me/music.listens?limit=100");
 $listens = $myListens['data'];
 /*
 $friends = $facebook->api("/me/friends");
 foreach ($friends['data'] as $friend) {
-    $friendListens = $facebook->api("/" . $friend['id'] . "/music.listens?limit=100");
-    $listens = array_merge($listens, $friendListens['data']);
+    $friendListens = $facebook->api("/".$friend['id']."/music.listens?limit=100");
+    $listens = array_merge($listens,$friendListens['data']);
 }
 */
 
@@ -18,12 +62,12 @@ foreach ($listens as $listen) {
         'listen_id' => $listen['id'],
         'friend_id' => $listen['from']['id']
     );
-    $listenDetails = $facebook->api("/" . $listen['data']['song']['id']);
+    $listenDetails = $facebook->api("/".$listen['data']['song']['id']);
     $formattedListen['artist'] = $listenDetails['data']['musician'][0]['name'];
     $formattedListen['song'] = $listenDetails['title'];
     $formattedListen['album'] = $listenDetails['data']['album'][0]['url']['title'];
     $audioUrl = $listenDetails['audio'][0]['url'];
-    if (strpos($audioUrl, "http://www.deezer.com/track/") !== false) {
+    if (strpos($audioUrl,"http://www.deezer.com/track/") !== false) {
         $formattedListen['deezer_id'] = substr($audioUrl, 28);
     } else {
         $formattedListen['deezer_id'] = '';
@@ -107,15 +151,39 @@ $delta = time() - $start;
         from <?php echo $user_profile['location']['name']; ?></h2>
 
     <div class="row marketing">
-        <div class="col-lg-12 ">
+        <div class="col-lg-6 scroll">
+            <table>
+                <?php
+                foreach ($formattedListens as $formattedListen) {
+                    echo '<tr>';
+                    echo '<td>' . $formattedListen['artist'] . " - " . $formattedListen['song'] . '</td>';
+                    if ($formattedListen['deezer_id'] <> '') {
+                        echo '<td><button type="button" class="btn btn-primary btn-xs" onclick="DZ.player.playTracks([' . $formattedListen["deezer_id"] . ']); return false;"><span class="glyphicon glyphicon-play white"></span></button></td>';
+                    }
+                    echo '</tr>';
+                    //echo json_encode($formattedListen)."<br/><br/>";
+                }
+                /*
+                echo "Listens: ".count($listens)."<br/>";
+                foreach ($listens as $listen) {
+                    echo $listen['id']." - ".$listen['data']['song']['title']." (".$listen['from']['name'].")<br/>";
+                }
+
+                echo "Friends: ".count($friends['data'])."<br/>";
+                foreach ($friends['data'] as $friend) {
+                    echo $friend['name']." ".$friend['id']."<br/>";
+                }
+                */
+                ?>
+            </table>
+        </div>
+
+        <div class="col-lg-6">
             <div id="dz-root"></div>
             <div id="player" style="width:100%;" align="center"></div>
-
+            <br/>
             <script>
                 $(document).ready(function () {
-                    $.ajax({
-                        url: 'refreshdata.php'
-                    });
                     $("#controlers input").attr('disabled', true);
                     $("#slider_seek").click(function (evt, arg) {
                         var left = evt.offsetX;
@@ -140,35 +208,6 @@ $delta = time() - $start;
                 });
             </script>
         </div>
-    </div>
-</div>
-<div class="row marketing">
-    <div class="col-lg-12 scroll">
-        <table>
-            <?php
-            echo "Data read time: " . $delta . "<br/>";
-            foreach ($formattedListens as $formattedListen) {
-                echo '<tr>';
-                echo '<td>' . $formattedListen['artist'] . " - " . $formattedListen['song'] . '</td>';
-                if ($formattedListen['deezer_id'] <> '') {
-                    echo '<td><button type="button" class="btn btn-primary btn-xs" onclick="DZ.player.playTracks([' . $formattedListen["deezer_id"] . ']); return false;"><span class="glyphicon glyphicon-play white"></span></button></td>';
-                }
-                echo '</tr>';
-                //echo json_encode($formattedListen)."<br/><br/>";
-            }
-            /*
-            echo "Listens: ".count($listens)."<br/>";
-            foreach ($listens as $listen) {
-                echo $listen['id']." - ".$listen['data']['song']['title']." (".$listen['from']['name'].")<br/>";
-            }
-
-            echo "Friends: ".count($friends['data'])."<br/>";
-            foreach ($friends['data'] as $friend) {
-                echo $friend['name']." ".$friend['id']."<br/>";
-            }
-            */
-            ?>
-        </table>
     </div>
 </div>
 </body>
