@@ -10,7 +10,7 @@
 include_once ("config.php");
 
 
-writeSong(1,2,'Petre', 'Corul Unirii', 'Vocea Unirii', 3, '2014-01-25 21:26:00');
+writeSong(1,2,'Petre1', 'Corul Unirii', 'Vocea Unirii', 3, '2014-01-25 21:26:00');
 
 function writeSong($listen_id, $friend_id, $song, $artist, $album, $deezer_id, $timestamp){
     $song_id = matchSong($song, $artist, $album);
